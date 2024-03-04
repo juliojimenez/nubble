@@ -1,6 +1,6 @@
 use pnet::datalink::{self, Channel::Ethernet};
-use pnet::packet::ethernet::{self, EtherTypes, EthernetPacket};
-use pnet::packet::{self, Packet};
+use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
+use pnet::packet::{Packet};
 use std::env;
 
 fn main() {
