@@ -1,4 +1,5 @@
 use clap::Parser;
+use clap::CommandFactory;
 use pnet::datalink::{self, Channel::Ethernet};
 use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
 use pnet::packet::ip::IpNextHeaderProtocol;
@@ -11,16 +12,16 @@ use std::io::{self, Write};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    // Name of the network interface to use.
-    #[arg(short, long, conflicts_with = "list", default_value = "eth0")]
+    /// Name of the network interface to use.
+    #[arg(short, long, default_value="")]
     interface: String,
     
-    // Select the network interface to use.
-    #[arg(short, long, conflicts_with = "interface")]
+    /// Select the network interface to use.
+    #[arg(short, long)]
     select: bool,
     
-    // List network interfaces.
-    #[arg(short, long, conflicts_with = "interface")]
+    /// List network interfaces.
+    #[arg(short, long)]
     list: bool,
 }
 
@@ -28,6 +29,7 @@ fn main() {
     let interfaces = datalink::interfaces();
     let interface_name;
     let args = Args::parse();
+    let mut cmd = Args::command();
     if args.list {
         println!("Available interfaces:");
         for (index, iface) in interfaces.iter().enumerate() {
@@ -48,10 +50,11 @@ fn main() {
         
         let selected_interface = interfaces.get(choice).expect("Selected interface does not exist");
         interface_name = selected_interface.name.clone();
-    } else if args.interface.is_empty() {
-        interface_name = "eth0".to_string();
-    } else {
+    } else if !args.interface.is_empty() {
         interface_name = args.interface;
+    } else {
+        cmd.print_help().unwrap();
+        return;
     }
     let interface = interfaces.into_iter()
         .find(|iface| iface.name == interface_name)
