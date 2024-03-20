@@ -5,9 +5,13 @@ use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
 use pnet::packet::ip::IpNextHeaderProtocol;
 use pnet::packet::ipv4::Ipv4Packet;
 use pnet::packet::ipv6::Ipv6Packet;
+use pnet::packet::arp::ArpPacket;
+use pnet::packet::arp::ArpOperation;
 use pnet::packet::Packet;
 use std::io::{self, Write};
-// use std::env;
+use std::env;
+use std::os::unix::fs as unix_fs;
+use std::path::Path;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -23,6 +27,10 @@ struct Args {
     /// List network interfaces.
     #[arg(short, long)]
     list: bool,
+    
+    /// Create a symlink in /usr/local/bin.
+    #[arg(long)]
+    symlink: bool,
 }
 
 fn main() {
@@ -52,6 +60,17 @@ fn main() {
         interface_name = selected_interface.name.clone();
     } else if !args.interface.is_empty() {
         interface_name = args.interface;
+    } else if args.symlink {
+        let current_exe = match env::current_exe() {
+            Ok(exe) => exe,
+            Err(e) => panic!("Failed to get current executable path: {}", e),
+        };
+        let symlink_path = Path::new("/usr/local/bin/nubble");
+        match unix_fs::symlink(current_exe, symlink_path) {
+            Ok(_) => println!("Created symlink at {}", symlink_path.display()),
+            Err(e) => panic!("Failed to create symlink: {}", e),
+        };
+        return;
     } else {
         cmd.print_help().unwrap();
         return;
@@ -83,16 +102,26 @@ fn handle_packet(ethernet: &EthernetPacket) {
     match ethernet.get_ethertype() {
         EtherTypes::Ipv4 => {
             if let Some(header) = Ipv4Packet::new(ethernet.payload()) {
-                println!("IPv4 packet: {} > {} proto {:?} len {}", header.get_source(), header.get_destination(), protocol_to_str(header.get_next_level_protocol()), header.get_total_length());
+                println!("IPv4 packet: {} > {} proto {} len {}", header.get_source(), header.get_destination(), protocol_to_str(header.get_next_level_protocol()), header.get_total_length());
                 let payload = header.payload();
                 println!("{}", to_hex_string(payload));
+                println!("{}", payload_to_ascii(payload));
             }
         },
         EtherTypes::Ipv6 => {
             if let Some(header) = Ipv6Packet::new(ethernet.payload()) {
-                println!("IPv6 packet: {} > {} next header {:?} payload len {}", header.get_source(), header.get_destination(), protocol_to_str(header.get_next_header()), header.get_payload_length());
+                println!("IPv6 packet: {} > {} next header {} payload len {}", header.get_source(), header.get_destination(), protocol_to_str(header.get_next_header()), header.get_payload_length());
                 let payload = header.payload();
                 println!("{}", to_hex_string(payload));
+                println!("{}", payload_to_ascii(payload));
+            }
+        },
+        EtherTypes::Arp => {
+            if  let Some(header) = ArpPacket::new(ethernet.payload()) {
+                println!("ARP packet: {} > {} operation {} len {}", header.get_sender_proto_addr(), header.get_target_proto_addr(), arp_operation_to_str(header.get_operation()), header.packet().len());
+                let payload = header.payload();
+                println!("{}", to_hex_string(payload));
+                println!("{}", payload_to_ascii(payload));
             }
         },
         _ => println!("Other packet: {}", ethernet.packet().len()),
@@ -103,6 +132,12 @@ fn to_hex_string(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect::<Vec<String>>().join(" ")
 }
 
+fn payload_to_ascii(payload: &[u8]) -> String {
+    payload.iter()
+           .map(|&b| if b >= 32 && b <= 126 { b as char } else { '.' })
+           .collect()
+}
+
 fn protocol_to_str(proto: IpNextHeaderProtocol) -> &'static str {
     match proto {
         IpNextHeaderProtocol(17) => "UDP",
@@ -111,6 +146,14 @@ fn protocol_to_str(proto: IpNextHeaderProtocol) -> &'static str {
         IpNextHeaderProtocol(2) => "IGMP",
         IpNextHeaderProtocol(89) => "OSPF",
         IpNextHeaderProtocol(50) => "ESP",
-        _ => "Other",
+        _ => "Other".trim_matches('"'),
+    }
+}
+
+fn arp_operation_to_str(op: ArpOperation) -> &'static str {
+    match op {
+        ArpOperation(1) => "Request",
+        ArpOperation(2) => "Reply",
+        _ => "Other".trim_matches('"'),
     }
 }
