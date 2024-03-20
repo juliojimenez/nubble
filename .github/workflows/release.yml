@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release Tag'
+        required: true
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Cargo Build Release
+        run: |
+          cargo build --release
+          cp target/release/nubble target/release/nubble-${{ inputs.release_version }}-linux-x64
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "nubble-*-linux-x64"
+          generateReleaseNotes: true
+          tag: ${{ inputs.release_version }}

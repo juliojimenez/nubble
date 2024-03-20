@@ -1,5 +1,11 @@
 version: 2
 updates:
+  - package-ecosystem: github-actions
+    directory: .github/workflows
+    schedule:
+      interval: daily
+      time: "05:00"
+      timezone: UTC
   - package-ecosystem: cargo
     directory: /
     schedule:
