@@ -1,5 +1,7 @@
 # nubble
 
+[![Release](https://github.com/juliojimenez/nubble/actions/workflows/release.yml/badge.svg)](https://github.com/juliojimenez/nubble/actions/workflows/release.yml) ![GitHub Release](https://img.shields.io/github/v/release/juliojimenez/nubble) ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/juliojimenez/nubble/total) ![GitHub Sponsors](https://img.shields.io/github/sponsors/juliojimenez)
+
 Packet capture tool.
 
 ## Options
