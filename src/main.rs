@@ -7,6 +7,8 @@ use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
 use pnet::packet::ip::IpNextHeaderProtocol;
 use pnet::packet::ipv4::Ipv4Packet;
 use pnet::packet::ipv6::Ipv6Packet;
+use pnet::packet::tcp::TcpPacket;
+use pnet::packet::udp::UdpPacket;
 use pnet::packet::Packet;
 use std::env;
 use std::io::{self, Write};
@@ -108,14 +110,29 @@ fn handle_packet(ethernet: &EthernetPacket) {
     match ethernet.get_ethertype() {
         EtherTypes::Ipv4 => {
             if let Some(header) = Ipv4Packet::new(ethernet.payload()) {
-                println!(
-                    "{} IP {} > {} proto {} len {}",
-                    timestamp(),
-                    header.get_source(),
-                    header.get_destination(),
-                    protocol_to_str(header.get_next_level_protocol()),
-                    header.get_total_length()
-                );
+                if let Some((src_port, dest_port)) =
+                    extract_ports(header.payload(), header.get_next_level_protocol())
+                {
+                    println!(
+                        "{} IP {}.{} > {}.{} proto {} len {}",
+                        timestamp(),
+                        header.get_source(),
+                        src_port,
+                        header.get_destination(),
+                        dest_port,
+                        protocol_to_str(header.get_next_level_protocol()),
+                        header.get_total_length()
+                    );
+                } else {
+                    println!(
+                        "{} IP {} > {} proto {} len {}",
+                        timestamp(),
+                        header.get_source(),
+                        header.get_destination(),
+                        protocol_to_str(header.get_next_level_protocol()),
+                        header.get_total_length()
+                    );
+                }
                 let payload = header.payload();
                 println!("{}", to_hex_string(payload));
                 println!("{}", payload_to_ascii(payload));
@@ -123,13 +140,29 @@ fn handle_packet(ethernet: &EthernetPacket) {
         }
         EtherTypes::Ipv6 => {
             if let Some(header) = Ipv6Packet::new(ethernet.payload()) {
-                println!(
-                    "IPv6 packet: {} > {} next header {} payload len {}",
-                    header.get_source(),
-                    header.get_destination(),
-                    protocol_to_str(header.get_next_header()),
-                    header.get_payload_length()
-                );
+                if let Some((src_port, dest_port)) =
+                    extract_ports(header.payload(), header.get_next_header())
+                {
+                    println!(
+                        "{} IP6 {}.{} > {}.{} next header {} payload len {}",
+                        timestamp(),
+                        header.get_source(),
+                        src_port,
+                        header.get_destination(),
+                        dest_port,
+                        protocol_to_str(header.get_next_header()),
+                        header.get_payload_length()
+                    );
+                } else {
+                    println!(
+                        "{} IP6 {} > {} next header {} payload len {}",
+                        timestamp(),
+                        header.get_source(),
+                        header.get_destination(),
+                        protocol_to_str(header.get_next_header()),
+                        header.get_payload_length()
+                    );
+                }
                 let payload = header.payload();
                 println!("{}", to_hex_string(payload));
                 println!("{}", payload_to_ascii(payload));
@@ -203,4 +236,21 @@ fn timestamp() -> String {
     } else {
         return "00:00:00.000000".to_string();
     }
+}
+
+fn extract_ports(payload: &[u8], protocol: IpNextHeaderProtocol) -> Option<(u16, u16)> {
+    match protocol {
+        IpNextHeaderProtocol(6) => {
+            if let Some(tcp) = TcpPacket::new(payload) {
+                return Some((tcp.get_source(), tcp.get_destination()));
+            }
+        }
+        IpNextHeaderProtocol(17) => {
+            if let Some(udp) = UdpPacket::new(payload) {
+                return Some((udp.get_source(), udp.get_destination()));
+            }
+        }
+        _ => return None, // Ignore other protocols
+    }
+    None
 }
