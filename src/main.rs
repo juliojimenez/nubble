@@ -157,11 +157,27 @@ fn handle_packet(ethernet: &EthernetPacket) {
         }
         EtherTypes::Ipv6 => {
             if let Some(header) = Ipv6Packet::new(ethernet.payload()) {
-                if let Some((src_port, dest_port)) =
+                let protocol = header.get_next_header();
+                if protocol == IpNextHeaderProtocols::Tcp {
+                    if let Some(tcp) = TcpPacket::new(header.payload()) {
+                        println!(
+                            "{} IP6 {}.{} > {}.{} proto {} seq {} ack {} len {}",
+                            timestamp(),
+                            header.get_source(),
+                            tcp.get_source(),
+                            header.get_destination(),
+                            tcp.get_destination(),
+                            protocol_to_str(header.get_next_header()),
+                            tcp.get_sequence(),
+                            tcp.get_acknowledgement(),
+                            header.get_payload_length()
+                        );
+                    }
+                } else if let Some((src_port, dest_port)) =
                     extract_ports(header.payload(), header.get_next_header())
                 {
                     println!(
-                        "{} IP6 {}.{} > {}.{} next header {} payload len {}",
+                        "{} IP6 {}.{} > {}.{} proto {} len {}",
                         timestamp(),
                         header.get_source(),
                         src_port,
@@ -172,7 +188,7 @@ fn handle_packet(ethernet: &EthernetPacket) {
                     );
                 } else {
                     println!(
-                        "{} IP6 {} > {} next header {} payload len {}",
+                        "{} IP6 {} > {} proto {} len {}",
                         timestamp(),
                         header.get_source(),
                         header.get_destination(),
