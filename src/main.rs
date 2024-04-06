@@ -5,6 +5,7 @@ use pnet::packet::arp::ArpOperation;
 use pnet::packet::arp::ArpPacket;
 use pnet::packet::ethernet::{EtherTypes, EthernetPacket};
 use pnet::packet::ip::IpNextHeaderProtocol;
+use pnet::packet::ip::IpNextHeaderProtocols;
 use pnet::packet::ipv4::Ipv4Packet;
 use pnet::packet::ipv6::Ipv6Packet;
 use pnet::packet::tcp::TcpPacket;
@@ -110,7 +111,23 @@ fn handle_packet(ethernet: &EthernetPacket) {
     match ethernet.get_ethertype() {
         EtherTypes::Ipv4 => {
             if let Some(header) = Ipv4Packet::new(ethernet.payload()) {
-                if let Some((src_port, dest_port)) =
+                let protocol = header.get_next_level_protocol();
+                if protocol == IpNextHeaderProtocols::Tcp {
+                    if let Some(tcp) = TcpPacket::new(header.payload()) {
+                        println!(
+                            "{} IP {}.{} > {}.{} proto {} seq {} ack {} len {}",
+                            timestamp(),
+                            header.get_source(),
+                            tcp.get_source(),
+                            header.get_destination(),
+                            tcp.get_destination(),
+                            protocol_to_str(header.get_next_level_protocol()),
+                            tcp.get_sequence(),
+                            tcp.get_acknowledgement(),
+                            header.get_total_length()
+                        );
+                    }
+                } else if let Some((src_port, dest_port)) =
                     extract_ports(header.payload(), header.get_next_level_protocol())
                 {
                     println!(
