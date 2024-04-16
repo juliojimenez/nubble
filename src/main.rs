@@ -115,7 +115,7 @@ fn handle_packet(ethernet: &EthernetPacket) {
                 if protocol == IpNextHeaderProtocols::Tcp {
                     if let Some(tcp) = TcpPacket::new(header.payload()) {
                         println!(
-                            "{} IP {}.{} > {}.{} proto {} seq {} ack {} len {}",
+                            "{} IP {}.{} > {}.{} proto {} seq {} ack {} flags {} len {}",
                             timestamp(),
                             header.get_source(),
                             tcp.get_source(),
@@ -124,6 +124,7 @@ fn handle_packet(ethernet: &EthernetPacket) {
                             protocol_to_str(header.get_next_level_protocol()),
                             tcp.get_sequence(),
                             tcp.get_acknowledgement(),
+                            tcp_flags_to_string(tcp.get_flags()),
                             header.get_total_length()
                         );
                     }
@@ -161,7 +162,7 @@ fn handle_packet(ethernet: &EthernetPacket) {
                 if protocol == IpNextHeaderProtocols::Tcp {
                     if let Some(tcp) = TcpPacket::new(header.payload()) {
                         println!(
-                            "{} IP6 {}.{} > {}.{} proto {} seq {} ack {} len {}",
+                            "{} IP6 {}.{} > {}.{} proto {} seq {} ack {} flags {} len {}",
                             timestamp(),
                             header.get_source(),
                             tcp.get_source(),
@@ -170,6 +171,7 @@ fn handle_packet(ethernet: &EthernetPacket) {
                             protocol_to_str(header.get_next_header()),
                             tcp.get_sequence(),
                             tcp.get_acknowledgement(),
+                            tcp_flags_to_string(tcp.get_flags()),
                             header.get_payload_length()
                         );
                     }
@@ -286,4 +288,33 @@ fn extract_ports(payload: &[u8], protocol: IpNextHeaderProtocol) -> Option<(u16,
         _ => return None, // Ignore other protocols
     }
     None
+}
+
+fn tcp_flags_to_string(flags: u8) -> String {
+    let mut flags_str = String::new();
+    if flags & 0x01 != 0 {
+        flags_str.push('F');
+    } // FIN
+    if flags & 0x02 != 0 {
+        flags_str.push('S');
+    } // SYN
+    if flags & 0x04 != 0 {
+        flags_str.push('R');
+    } // RST
+    if flags & 0x08 != 0 {
+        flags_str.push('P');
+    } // PSH
+    if flags & 0x10 != 0 {
+        flags_str.push('A');
+    } // ACK
+    if flags & 0x20 != 0 {
+        flags_str.push('U');
+    } // URG
+    if flags & 0x40 != 0 {
+        flags_str.push('E');
+    } // ECE
+    if flags & 0x80 != 0 {
+        flags_str.push('C');
+    } // CWR
+    flags_str
 }
